@@ -1,8 +1,8 @@
+package model;
 
-public class PriceType {
- SALE,
-    PURCHASE,
-    DISCOUNT,
-    WHOLESALE
+public enum PriceType {
+	
+	SALE,
+	PURCHASE,
+
 }
-
