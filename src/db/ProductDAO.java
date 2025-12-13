@@ -1,8 +1,11 @@
+package dao;
+
 import java.sql.*;
 import java.util.ArrayList;
 import java.util.List;
+import model.Product;
 
-public class ProductDAO implements IProductDAOF {
+public class ProductDAO implements ProductDAOIF {
 
     private Connection conn;
 
@@ -11,7 +14,7 @@ public class ProductDAO implements IProductDAOF {
     }
 
     @Override
-    public Product findProductByID(int id) throws Exception {
+    public Product findProductByID(int id) throws SQLException {
         String sql = "SELECT * FROM product WHERE product_id = ?";
         PreparedStatement ps = conn.prepareStatement(sql);
         ps.setInt(1, id);
@@ -28,7 +31,7 @@ public class ProductDAO implements IProductDAOF {
     }
 
     @Override
-    public List<Product> findAllProducts() throws Exception {
+    public List<Product> findAllProducts() throws SQLException {
         String sql = "SELECT * FROM product";
         PreparedStatement ps = conn.prepareStatement(sql);
         ResultSet rs = ps.executeQuery();
@@ -45,4 +48,3 @@ public class ProductDAO implements IProductDAOF {
         return products;
     }
 }
-

@@ -1,7 +1,11 @@
+package dao;
+
 import java.util.List;
+import java.sql.SQLException;
+import model.Product;
 
-public interface IProductDAOF {
-    Product findProductByID(int productID) throws Exception;
+public interface ProductDAOIF {
+    Product findProductByID(int productID) throws SQLException;
 
-    List<Product> findAllProducts() throws Exception;
+    List<Product> findAllProducts() throws SQLException;
 }
