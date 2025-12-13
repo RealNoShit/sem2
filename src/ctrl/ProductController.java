@@ -1,18 +1,23 @@
+package controller;
+
 import java.util.List;
+import java.sql.SQLException;
+import dao.ProductDAOIF;
+import model.Product;
 
 public class ProductController {
 
-    private ProductDAO productDAO;
+    private ProductDAOIF productDAO;
 
-    public ProductController(ProductDAO productDAO) {
+    public ProductController(ProductDAOIF productDAO) {
         this.productDAO = productDAO;
     }
 
-    public Product findProductByID(int productID) throws Exception {
+    public Product findProductByID(int productID) throws SQLException {
         return productDAO.findProductByID(productID);
     }
 
-    public List<Product> findAllProducts() throws Exception {
+    public List<Product> findAllProducts() throws SQLException {
         return productDAO.findAllProducts();
     }
 }
