@@ -31,7 +31,7 @@ public class Service {
 		return name;
 	}
 	
-	public double price() {
+	public double getPrice() {
 		return price;
 	}
 
