@@ -1,55 +1,63 @@
-package db;
-import java.sql.Connection;
-import java.sql.PreparedStatement;
-import java.sql.ResultSet;
-import java.sql.SQLException;
+package dao;
+
+import java.sql.*;
 import java.util.ArrayList;
 import java.util.List;
 import model.Service;
 
 public class ServiceDAO implements ServiceDAOIF {
 
-    private final Connection connection;
+    private Connection connection;
 
     public ServiceDAO(Connection connection) {
         this.connection = connection;
     }
 
     @Override
-    public Service findServiceByID(int id) throws SQLException {
-        String sql = "SELECT service_id, name, price FROM Service WHERE service_id = ?";
-        try (PreparedStatement stmt = connection.prepareStatement(sql)) {
-            stmt.setInt(1, id);
+    public Service findServiceByID(int serviceID) {
+        String sql = "SELECT * FROM service WHERE service_id = ?";
 
-            try (ResultSet rs = stmt.executeQuery()) {
-                if (rs.next()) {
-                    return buildObject(rs);
-                }
+        try (PreparedStatement stmt = connection.prepareStatement(sql)) {
+            stmt.setInt(1, serviceID);
+            ResultSet rs = stmt.executeQuery();
+
+            if (rs.next()) {
+                return new Service(
+                    rs.getInt("service_id"),
+                    rs.getString("name"),
+                    rs.getDouble("price")
+                );
             }
+            return null;
+
+        } catch (SQLException e) {
+            throw new DataAccessException(
+                "Could not find service with ID " + serviceID, e
+            );
         }
-        return null;
     }
 
     @Override
-    public List<Service> findAllServices() throws SQLException {
-        String sql = "SELECT service_id, name, price FROM Service";
+    public List<Service> findAllServices() {
         List<Service> services = new ArrayList<>();
+        String sql = "SELECT * FROM service";
 
         try (PreparedStatement stmt = connection.prepareStatement(sql);
              ResultSet rs = stmt.executeQuery()) {
 
             while (rs.next()) {
-                services.add(buildObject(rs));
+                services.add(new Service(
+                    rs.getInt("service_id"),
+                    rs.getString("name"),
+                    rs.getDouble("price")
+                ));
             }
+            return services;
+
+        } catch (SQLException e) {
+            throw new DataAccessException(
+                "Could not retrieve services", e
+            );
         }
-        return services;
-    }
-
-    private Service buildObject(ResultSet rs) throws SQLException {
-        int id = rs.getInt("service_id");
-        String name = rs.getString("name");
-        double price = rs.getDouble("price");
-
-        return new Service(id, name, price);
     }
 }

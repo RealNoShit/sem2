@@ -1,8 +1,7 @@
-package db;
+package dao;
 
 import model.*;
 import java.sql.*;
-import java.util.ArrayList;
 import java.util.List;
 
 public class OrderDAO {
@@ -13,7 +12,7 @@ public class OrderDAO {
         this.connection = connection;
     }
 
-    public Order findOrderByID(int id) throws SQLException {
+    public Order findOrderByID(int id) {
         String sql = "SELECT * FROM orders WHERE order_id = ?";
 
         try (PreparedStatement stmt = connection.prepareStatement(sql)) {
@@ -26,19 +25,29 @@ public class OrderDAO {
                     return order;
                 }
             }
+            return null;
+
+        } catch (SQLException e) {
+            throw new DataAccessException("Failed to find order with id " + id, e);
         }
-        return null;
     }
 
-    public void saveOrder(Order order) throws SQLException {
-        if (orderExists(order.getOrderID())) {
-            updateOrder(order);
-        } else {
-            insertOrder(order);
-        }
+    public void saveOrder(Order order) {
+        try {
+            if (orderExists(order.getOrderID())) {
+                updateOrder(order);
+            } else {
+                insertOrder(order);
+            }
 
-        deleteOrderLines(order.getOrderID());
-        insertOrderLines(order);
+            deleteOrderLines(order.getOrderID());
+            insertOrderLines(order);
+
+        } catch (SQLException e) {
+            throw new DataAccessException(
+                "Failed to save order with id " + order.getOrderID(), e
+            );
+        }
     }
 
     private boolean orderExists(int id) throws SQLException {
@@ -133,10 +142,10 @@ public class OrderDAO {
         Order order = new Order(id, caseRef);
 
         order.setCeremonyDetails(
-                rs.getString("ceremony_type"),
-                rs.getString("church"),
-                rs.getString("ceremony_date"),
-                rs.getString("ceremony_time")
+            rs.getString("ceremony_type"),
+            rs.getString("church"),
+            rs.getString("ceremony_date"),
+            rs.getString("ceremony_time")
         );
 
         order.setStatus(rs.getString("status"));
@@ -144,35 +153,40 @@ public class OrderDAO {
         return order;
     }
 
-    private void loadOrderLines(Order order) throws SQLException {
+    private void loadOrderLines(Order order) {
         String sql = "SELECT * FROM orderline WHERE order_id = ?";
 
         try (PreparedStatement stmt = connection.prepareStatement(sql)) {
             stmt.setInt(1, order.getOrderID());
 
             try (ResultSet rs = stmt.executeQuery()) {
+                ProductDAO productDAO = new ProductDAO(connection);
+                ServiceDAO serviceDAO = new ServiceDAO(connection);
+
                 while (rs.next()) {
-                    int lineID = rs.getInt("line_id");
                     int quantity = rs.getInt("quantity");
-                    double price = rs.getDouble("unit_price");
 
                     Integer productID = (Integer) rs.getObject("product_id");
                     Integer serviceID = (Integer) rs.getObject("service_id");
 
                     if (productID != null) {
-                        ProductDAO productDAO = new ProductDAO(connection);
                         Product p = productDAO.findProductByID(productID);
                         order.addProduct(p, quantity);
                     }
                     else if (serviceID != null) {
-                        ServiceDAO serviceDAO = new ServiceDAO(connection);
                         Service s = serviceDAO.findServiceByID(serviceID);
                         order.addService(s);
                     }
                 }
             }
-        }
 
-        order.calculateTotal();
+            order.calculateTotal();
+
+        } catch (SQLException e) {
+            throw new DataAccessException(
+                "Failed to load order lines for order " + order.getOrderID(), e
+            );
+        }
     }
 }
+
