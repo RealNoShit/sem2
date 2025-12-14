@@ -1,4 +1,5 @@
 package db;
+import model.*;
 
 public interface CaseDAOIF {
 

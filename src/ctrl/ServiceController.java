@@ -1,7 +1,7 @@
-package controller;
+package ctrl;
 import java.sql.SQLException;
 import java.util.List;
-import dao.ServiceDAOIF;
+import db.*;
 import model.Service;
 
 public class ServiceController {

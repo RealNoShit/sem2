@@ -1,8 +1,8 @@
-package controller;
+package ctrl;
 
 import java.util.List;
 import java.sql.SQLException;
-import dao.ProductDAOIF;
+import db.ProductDAOIF;
 import model.Product;
 
 public class ProductController {

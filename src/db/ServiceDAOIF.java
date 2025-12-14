@@ -1,4 +1,4 @@
-package dao;
+package db;
 
 import java.sql.SQLException;
 import java.util.List;
