@@ -1,4 +1,5 @@
 package ctrl;
+
 import model.*;
 import db.*;
 
@@ -11,97 +12,75 @@ public class OrderController {
     private final ProductController productController;
     private final ServiceController serviceController;
 
-    /**
-     * Creates an OrderController.
-     */
     public OrderController(CaseController caseController,
                            OrderDAO orderDAO,
                            ProductController productController,
                            ServiceController serviceController) {
-        this.caseController = Objects.requireNonNull(caseController, "caseController");
-        this.orderDAO = Objects.requireNonNull(orderDAO, "orderDAO");
-        this.productController = Objects.requireNonNull(productController, "productController");
-        this.serviceController = Objects.requireNonNull(serviceController, "serviceController");
+        this.caseController = Objects.requireNonNull(caseController);
+        this.orderDAO = Objects.requireNonNull(orderDAO);
+        this.productController = Objects.requireNonNull(productController);
+        this.serviceController = Objects.requireNonNull(serviceController);
     }
 
-    /**
-     * Opens an existing case.
-     */
-    public Case openCase(int caseID) {
-        return caseController.findCaseByID(caseID);
+    public boolean openCase(int caseID) {
+        return caseController.findCaseByID(caseID) != null;
     }
 
-    /**
-     * Registers a new order for the given case.
-     */
-    public Order registerNewOrder(int caseID) {
-        Case caseRef = openCase(caseID);
-        if (caseRef == null) {
-            throw new IllegalArgumentException("No case found with id " + caseID);
-        }
-        return orderDAO.createOrder(caseRef);
+    public int registerNewOrder(int caseID) {
+        Case c = caseController.findCaseByID(caseID);
+        if (c == null) throw new IllegalArgumentException("No case with id " + caseID);
+
+        Order order = orderDAO.createOrder(c);   // creates + persists (or creates and returns with new id)
+        return order.getOrderID();
     }
 
-    /**
-     * Adds / updates ceremony details on the given order.
-     */
-    public void addCeremonyDetails(Order order,
-                                   String type,
-                                   String church,
-                                   String date,
-                                   String time) {
-        if (order == null) {
-            throw new IllegalArgumentException("order cannot be null");
-        }
+    public void addCeremonyDetails(int orderId, String type, String church, String date, String time) {
+        Order order = requireOrder(orderId);
         order.setCeremonyDetails(type, church, date, time);
+        orderDAO.update(order); // persist changes
     }
 
-    /**
-     * Adds a product line to the order.
-     */
-    public void addProduct(Order order, int productID, int quantity) {
-        if (order == null) {
-            throw new IllegalArgumentException("order cannot be null");
-        }
+    public void addProduct(int orderId, int productID, int quantity) {
+        Order order = requireOrder(orderId);
+
         Product product = productController.findProductByID(productID);
-        if (product == null) {
-            throw new IllegalArgumentException("No product found with id " + productID);
-        }
+        if (product == null) throw new IllegalArgumentException("No product with id " + productID);
+
         order.addProduct(product, quantity);
+
+        // optional: if you have inventory observer, reduce stock here or in a domain service
+        // product.getInventory().reduceStock(quantity);
+
+        orderDAO.update(order);
     }
 
-    /**
-     * Adds a service line to the order.
-     */
-    public void addService(Order order, int serviceID) {
-        if (order == null) {
-            throw new IllegalArgumentException("order cannot be null");
-        }
+    public void addService(int orderId, int serviceID) {
+        Order order = requireOrder(orderId);
+
         Service service = serviceController.findServiceByID(serviceID);
-        if (service == null) {
-            throw new IllegalArgumentException("No service found with id " + serviceID);
-        }
+        if (service == null) throw new IllegalArgumentException("No service with id " + serviceID);
+
         order.addService(service);
+        orderDAO.update(order);
     }
 
-    /**
-     * Validates the order and, if valid, saves it via the DAO.
-     *
-     * @return true if the order validated and was saved, false otherwise.
-     */
-    public boolean confirmOrder(Order order) {
-        if (order == null) {
-            return false;
-        }
+    public boolean confirmOrder(int orderId) {
+        Order order = requireOrder(orderId);
 
-        // Make sure totals are up to date before validating / persisting
         order.calculateTotal();
+        if (!order.validate()) return false;
 
-        if (!order.validate()) {
-            return false;
-        }
-
-        orderDAO.save(order);
+        orderDAO.confirm(order); // or save/update + mark confirmed
         return true;
     }
+
+    private Order requireOrder(int orderId) {
+        Order order = orderDAO.findById(orderId);
+        if (order == null) {
+            throw new IllegalArgumentException("No order with id " + orderId);
+        }
+        return order;
+    }
 }
+
+

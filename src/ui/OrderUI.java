@@ -1,28 +1,20 @@
 package ui;
 import ctrl.*;
-
 import java.util.InputMismatchException;
 import java.util.Scanner;
 
 public class OrderUI {
 
     private final OrderController orderController;
-    private final Scanner scanner;
+    private final Scanner scanner = new Scanner(System.in);
 
-    private Case currentCase;
-    private Order currentOrder;
+    private Integer currentCaseId = null;
+    private Integer currentOrderId = null;
 
-    /**
-     * «create» OrderUI
-     */
     public OrderUI(OrderController orderController) {
         this.orderController = orderController;
-        this.scanner = new Scanner(System.in);
     }
 
-    /**
-     * Simple console loop so you can try things out.
-     */
     public void run() {
         boolean running = true;
 
@@ -50,38 +42,39 @@ public class OrderUI {
                 default -> System.out.println("Unknown choice");
             }
         }
-
         System.out.println("Bye.");
     }
 
-    // -------- methods from the UML --------
-
     public void openCase() {
         System.out.print("Enter case ID: ");
-        int caseID = readInt();
+        int caseId = readInt();
 
-        currentCase = orderController.openCase(caseID);
-        if (currentCase == null) {
-            System.out.println("No case found with ID " + caseID);
+        boolean ok = orderController.openCase(caseId);
+        if (!ok) {
+            System.out.println("No case found with ID " + caseId);
+            currentCaseId = null;
+            currentOrderId = null;
         } else {
-            System.out.println("Opened case " + currentCase.getCaseID() +
-                    " for customer " + currentCase.getCustomerName());
+            currentCaseId = caseId;
+            currentOrderId = null;
+            System.out.println("Case opened.");
         }
     }
 
     public void registerNewOrder() {
-        if (currentCase == null) {
-            System.out.println("You must open a case first.");
+        if (currentCaseId == null) {
+            System.out.println("Open a case first.");
             return;
         }
 
-        currentOrder = orderController.registerNewOrder(currentCase.getCaseID());
-        System.out.println("New order created with ID " + currentOrder.getOrderID());
+        int orderId = orderController.registerNewOrder(currentCaseId);
+        currentOrderId = orderId;
+        System.out.println("New order created with ID " + orderId);
     }
 
     public void enterCeremonyDetails() {
-        if (currentOrder == null) {
-            System.out.println("You must create an order first.");
+        if (currentOrderId == null) {
+            System.out.println("Create an order first.");
             return;
         }
 
@@ -97,64 +90,64 @@ public class OrderUI {
         System.out.print("Time (e.g. 14:00): ");
         String time = readLine();
 
-        orderController.addCeremonyDetails(currentOrder, type, church, date, time);
+        orderController.addCeremonyDetails(currentOrderId, type, church, date, time);
         System.out.println("Ceremony details saved.");
     }
 
     public void addProductToOrder() {
-        if (currentOrder == null) {
-            System.out.println("You must create an order first.");
+        if (currentOrderId == null) {
+            System.out.println("Create an order first.");
             return;
         }
 
         System.out.print("Product ID: ");
-        int productID = readInt();
+        int productId = readInt();
 
         System.out.print("Quantity: ");
-        int quantity = readInt();
+        int qty = readInt();
 
-        orderController.addProduct(currentOrder, productID, quantity);
+        orderController.addProduct(currentOrderId, productId, qty);
         System.out.println("Product added.");
     }
 
     public void addServiceToOrder() {
-        if (currentOrder == null) {
-            System.out.println("You must create an order first.");
+        if (currentOrderId == null) {
+            System.out.println("Create an order first.");
             return;
         }
 
         System.out.print("Service ID: ");
-        int serviceID = readInt();
+        int serviceId = readInt();
 
-        orderController.addService(currentOrder, serviceID);
+        orderController.addService(currentOrderId, serviceId);
         System.out.println("Service added.");
     }
 
     public void confirmOrder() {
-        if (currentOrder == null) {
-            System.out.println("You must create an order first.");
+        if (currentOrderId == null) {
+            System.out.println("Create an order first.");
             return;
         }
 
-        boolean ok = orderController.confirmOrder(currentOrder);
+        boolean ok = orderController.confirmOrder(currentOrderId);
         if (ok) {
             System.out.println("Order confirmed and saved.");
-            currentOrder = null; // finished
+            currentOrderId = null;
         } else {
-            System.out.println("Order is not valid – please check details.");
+            System.out.println("Order is not valid – check details.");
         }
     }
 
-    // -------- helpers --------
+    // ---------- input helpers ----------
 
     private int readInt() {
         while (true) {
             try {
                 int value = scanner.nextInt();
-                scanner.nextLine();   // consume rest of line
+                scanner.nextLine(); // consume newline
                 return value;
             } catch (InputMismatchException e) {
-                scanner.nextLine();   // clear invalid input
+                scanner.nextLine();
                 System.out.print("Please enter a number: ");
             }
         }
@@ -162,39 +155,8 @@ public class OrderUI {
 
     private String readLine() {
         String line = scanner.nextLine();
-        // If the previous nextInt left a newline, read again
-        if (line.isEmpty()) {
-            line = scanner.nextLine();
-        }
+        if (line.isEmpty()) line = scanner.nextLine();
         return line;
     }
-
-    // Optional: quick entry point
-    public static void main(String[] args) {
-        // Wire everything together here once all DAOs/controllers exist
-        // (placeholders, adjust to your own classes / constructors)
-
-        try {
-            var connection = DBConnection.getConnection();
-
-            CaseDAO caseDAO = new CaseDAO(connection);
-            CaseController caseController = new CaseController(caseDAO);
-
-            ProductDAO productDAO = new ProductDAO(connection);
-            ProductController productController = new ProductController(productDAO);
-
-            ServiceDAO serviceDAO = new ServiceDAO(connection);
-            ServiceController serviceController = new ServiceController(serviceDAO);
-
-            OrderDAO orderDAO = new OrderDAO(connection);
-
-            OrderController orderController =
-                    new OrderController(caseController, orderDAO, productController, serviceController);
-
-            new OrderUI(orderController).run();
-        } catch (DataAccessException e) {
-            System.err.println("Cannot start application: " + e.getMessage());
-            e.printStackTrace();
-        }
-    }
 }
+
