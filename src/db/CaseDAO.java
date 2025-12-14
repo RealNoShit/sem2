@@ -1,5 +1,6 @@
 package db;
-import model.*;
+
+import model.Case;
 
 import java.sql.Connection;
 import java.sql.PreparedStatement;
@@ -10,16 +11,12 @@ public class CaseDAO implements CaseDAOIF {
 
     private final Connection connection;
 
-    /**
-     * Creates a CaseDAO.
-     */
     public CaseDAO(Connection connection) {
         this.connection = connection;
     }
 
     @Override
     public Case findCaseByID(int caseID) {
-        // Adjust table/column names to match your actual schema
         final String sql =
                 "SELECT caseID, deceasedName, customerName " +
                 "FROM Cases " +
@@ -32,19 +29,15 @@ public class CaseDAO implements CaseDAOIF {
                 if (rs.next()) {
                     return buildObject(rs);
                 }
+                return null;
             }
-        } catch (SQLException e) {
-            // You can change this to your own exception handling strategy
-            throw new RuntimeException("Error finding case with id " + caseID, e);
-        }
 
-        return null;
+        } catch (SQLException e) {
+            throw new DataAccessException(DBMessages.QUERY_FAILED, e);
+        }
     }
 
-    /**
-     * Builds a Case object from the current row of the given ResultSet.
-     */
-    public Case buildObject(ResultSet rs) throws SQLException {
+    private Case buildObject(ResultSet rs) throws SQLException {
         int id = rs.getInt("caseID");
         String deceasedName = rs.getString("deceasedName");
         String customerName = rs.getString("customerName");
