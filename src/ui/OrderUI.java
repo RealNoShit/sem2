@@ -1,152 +1,183 @@
 package ui;
-import ctrl.*;
+
+import ctrl.OrderController;
+import model.Case;
+import model.Order;
+
 import java.util.InputMismatchException;
 import java.util.Scanner;
 
 public class OrderUI {
 
     private final OrderController orderController;
-    private final Scanner scanner = new Scanner(System.in);
+    private final Scanner scanner;
 
-    private Integer currentCaseId = null;
-    private Integer currentOrderId = null;
+    private Case currentCase;
+    private Order currentOrder;
 
     public OrderUI(OrderController orderController) {
         this.orderController = orderController;
+        this.scanner = new Scanner(System.in);
     }
 
     public void run() {
         boolean running = true;
 
         while (running) {
-            System.out.println();
-            System.out.println("=== Order Menu ===");
-            System.out.println("1. Open case");
-            System.out.println("2. Register new order");
-            System.out.println("3. Enter ceremony details");
-            System.out.println("4. Add product to order");
-            System.out.println("5. Add service to order");
-            System.out.println("6. Confirm order");
-            System.out.println("0. Exit");
-            System.out.print("Choose: ");
+            printMenu();
+            int choice = readInteger();
 
-            int choice = readInt();
-            switch (choice) {
-                case 1 -> openCase();
-                case 2 -> registerNewOrder();
-                case 3 -> enterCeremonyDetails();
-                case 4 -> addProductToOrder();
-                case 5 -> addServiceToOrder();
-                case 6 -> confirmOrder();
-                case 0 -> running = false;
-                default -> System.out.println("Unknown choice");
+            try {
+                switch (choice) {
+                    case 1 -> openCase();
+                    case 2 -> registerNewOrder();
+                    case 3 -> enterCeremonyDetails();
+                    case 4 -> addProductToOrder();
+                    case 5 -> addServiceToOrder();
+                    case 6 -> confirmOrder();
+                    case 0 -> running = false;
+                    default -> System.out.println("Unknown choice.");
+                }
+            } catch (IllegalArgumentException exception) {
+                System.out.println("Error: " + exception.getMessage());
             }
         }
+
         System.out.println("Bye.");
     }
 
-    public void openCase() {
+    // ------------------------------------------------------------
+    // Menu actions
+    // ------------------------------------------------------------
+
+    private void openCase() {
         System.out.print("Enter case ID: ");
-        int caseId = readInt();
+        int caseId = readInteger();
 
-        boolean ok = orderController.openCase(caseId);
-        if (!ok) {
-            System.out.println("No case found with ID " + caseId);
-            currentCaseId = null;
-            currentOrderId = null;
-        } else {
-            currentCaseId = caseId;
-            currentOrderId = null;
-            System.out.println("Case opened.");
-        }
-    }
-
-    public void registerNewOrder() {
-        if (currentCaseId == null) {
-            System.out.println("Open a case first.");
+        Case foundCase = orderController.openCase(caseId);
+        if (foundCase == null) {
+            System.out.println("No case found with ID " + caseId + ".");
+            currentCase = null;
+            currentOrder = null;
             return;
         }
 
-        int orderId = orderController.registerNewOrder(currentCaseId);
-        currentOrderId = orderId;
-        System.out.println("New order created with ID " + orderId);
+        currentCase = foundCase;
+        currentOrder = null;
+        System.out.println("Case opened.");
     }
 
-    public void enterCeremonyDetails() {
-        if (currentOrderId == null) {
-            System.out.println("Create an order first.");
-            return;
-        }
+    private void registerNewOrder() {
+        ensureCaseIsOpen();
+
+        Order newOrder = orderController.registerNewOrder(currentCase);
+        currentOrder = newOrder;
+
+        System.out.println("New order created with ID " + currentOrder.getOrderID() + ".");
+    }
+
+    private void enterCeremonyDetails() {
+        ensureOrderExists();
 
         System.out.print("Ceremony type: ");
-        String type = readLine();
+        String ceremonyType = readLine();
 
         System.out.print("Church: ");
         String church = readLine();
 
-        System.out.print("Date (e.g. 2025-05-01): ");
-        String date = readLine();
+        System.out.print("Date (YYYY-MM-DD): ");
+        String ceremonyDate = readLine();
 
-        System.out.print("Time (e.g. 14:00): ");
-        String time = readLine();
+        System.out.print("Time (HH:MM): ");
+        String ceremonyTime = readLine();
 
-        orderController.addCeremonyDetails(currentOrderId, type, church, date, time);
+        orderController.addCeremonyDetails(
+                currentOrder,
+                ceremonyType,
+                church,
+                ceremonyDate,
+                ceremonyTime
+        );
+
         System.out.println("Ceremony details saved.");
     }
 
-    public void addProductToOrder() {
-        if (currentOrderId == null) {
-            System.out.println("Create an order first.");
-            return;
-        }
+    private void addProductToOrder() {
+        ensureOrderExists();
 
         System.out.print("Product ID: ");
-        int productId = readInt();
+        int productId = readInteger();
 
         System.out.print("Quantity: ");
-        int qty = readInt();
+        int quantity = readInteger();
 
-        orderController.addProduct(currentOrderId, productId, qty);
-        System.out.println("Product added.");
+        orderController.addProduct(currentOrder, productId, quantity);
+        System.out.println("Product added to order.");
     }
 
-    public void addServiceToOrder() {
-        if (currentOrderId == null) {
-            System.out.println("Create an order first.");
-            return;
-        }
+    private void addServiceToOrder() {
+        ensureOrderExists();
 
         System.out.print("Service ID: ");
-        int serviceId = readInt();
+        int serviceId = readInteger();
 
-        orderController.addService(currentOrderId, serviceId);
-        System.out.println("Service added.");
+        orderController.addService(currentOrder, serviceId);
+        System.out.println("Service added to order.");
     }
 
-    public void confirmOrder() {
-        if (currentOrderId == null) {
-            System.out.println("Create an order first.");
+    private void confirmOrder() {
+        ensureOrderExists();
+
+        boolean confirmed = orderController.confirmOrder(currentOrder);
+        if (!confirmed) {
+            System.out.println("Order is not valid. Please check details.");
             return;
         }
 
-        boolean ok = orderController.confirmOrder(currentOrderId);
-        if (ok) {
-            System.out.println("Order confirmed and saved.");
-            currentOrderId = null;
-        } else {
-            System.out.println("Order is not valid – check details.");
+        System.out.println("Order confirmed and saved.");
+        currentOrder = null;
+    }
+
+    // ------------------------------------------------------------
+    // Helpers
+    // ------------------------------------------------------------
+
+    private void ensureCaseIsOpen() {
+        if (currentCase == null) {
+            throw new IllegalArgumentException("Please open a case first.");
         }
     }
 
-    // ---------- input helpers ----------
+    private void ensureOrderExists() {
+        if (currentOrder == null) {
+            throw new IllegalArgumentException("Please create an order first.");
+        }
+    }
 
-    private int readInt() {
+    private void printMenu() {
+        System.out.println();
+        System.out.println("=== Order Menu ===");
+        System.out.println("1. Open case");
+        System.out.println("2. Register new order");
+        System.out.println("3. Enter ceremony details");
+        System.out.println("4. Add product to order");
+        System.out.println("5. Add service to order");
+        System.out.println("6. Confirm order");
+        System.out.println("0. Exit");
+        System.out.print("Choose: ");
+    }
+
+    // ------------------------------------------------------------
+    // Input handling
+    // ------------------------------------------------------------
+
+    private int readInteger() {
         while (true) {
             try {
                 int value = scanner.nextInt();
                 scanner.nextLine(); // consume newline
                 return value;
-            } catch (InputMismatchException e) {
+            } catch (InputMismatchException exception) {
                 scanner.nextLine();
                 System.out.print("Please enter a number: ");
             }
@@ -154,9 +185,12 @@ public class OrderUI {
     }
 
     private String readLine() {
-        String line = scanner.nextLine();
-        if (line.isEmpty()) line = scanner.nextLine();
-        return line;
+        String input = scanner.nextLine();
+        while (input.isBlank()) {
+            input = scanner.nextLine();
+        }
+        return input;
     }
 }
+
 
