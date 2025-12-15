@@ -1,5 +1,11 @@
-import java.sql.SQLException;
-import java.util.List;
+package db;
 
-Product findProductByID(int id);
-List<Product> findAllProducts();
+import java.util.List;
+import model.Product;
+
+public interface ProductDAOIF {
+
+    Product findProductByID(int id);
+
+    List<Product> findAllProducts();
+}
