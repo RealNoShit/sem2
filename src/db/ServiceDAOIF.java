@@ -1,4 +1,4 @@
-package dao;
+package db;
 
 import java.util.List;
 import model.Service;

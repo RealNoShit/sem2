@@ -1,6 +1,7 @@
 package ui;
 import ctrl.*;
 import db.*;
+import model.*;
 
 import java.sql.Connection;
 

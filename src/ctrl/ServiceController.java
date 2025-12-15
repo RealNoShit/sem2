@@ -1,4 +1,4 @@
-package controller;
+package ctrl;
 import java.util.List;
 import dao.ServiceDAOIF;
 import model.Service;
