@@ -1,6 +1,6 @@
 package ctrl;
 import java.util.List;
-import dao.ServiceDAOIF;
+import db.ServiceDAOIF;
 import model.Service;
 
 public class ServiceController {
