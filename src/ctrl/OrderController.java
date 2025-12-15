@@ -48,9 +48,6 @@ public class OrderController {
 
         order.addProduct(product, quantity);
 
-        // optional: if you have inventory observer, reduce stock here or in a domain service
-        // product.getInventory().reduceStock(quantity);
-
         orderDAO.update(order);
     }
 
