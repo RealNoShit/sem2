@@ -1,8 +1,16 @@
 package db;
 
-import model.*;
-import java.sql.*;
-import java.util.List;
+import model.Case;
+import model.Order;
+import model.OrderLine;
+import model.Product;
+import model.Service;
+
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.sql.Types;
 
 public class OrderDAO {
 
@@ -12,180 +20,189 @@ public class OrderDAO {
         this.connection = connection;
     }
 
-    public Order findOrderByID(int id) {
-        String sql = "SELECT * FROM orders WHERE order_id = ?";
-
-        try (PreparedStatement stmt = connection.prepareStatement(sql)) {
-            stmt.setInt(1, id);
-
-            try (ResultSet rs = stmt.executeQuery()) {
-                if (rs.next()) {
-                    Order order = buildOrder(rs);
-                    loadOrderLines(order);
-                    return order;
-                }
-            }
-            return null;
-
-        } catch (SQLException e) {
-            throw new DataAccessException("Failed to find order with id " + id, e);
+    // + createOrder(caseRef : Case) : Order
+    public Order createOrder(Case caseReference) {
+        if (caseReference == null) {
+            throw new IllegalArgumentException("Case reference must not be null.");
         }
+
+        int newOrderId = generateNextOrderId();
+        Order order = new Order(newOrderId, caseReference);
+        order.setStatus("CREATED");
+
+        save(order);
+        return order;
     }
 
-    public void saveOrder(Order order) {
+    // + save(order : Order) : void
+    public void save(Order order) {
+        if (order == null) {
+            throw new IllegalArgumentException("Order must not be null.");
+        }
+
         try {
             if (orderExists(order.getOrderID())) {
-                updateOrder(order);
+                updateOrderRow(order);
             } else {
-                insertOrder(order);
+                insertOrderRow(order);
             }
 
             deleteOrderLines(order.getOrderID());
             insertOrderLines(order);
 
-        } catch (SQLException e) {
+        } catch (SQLException exception) {
             throw new DataAccessException(
-                "Failed to save order with id " + order.getOrderID(), e
+                    DBMessages.UPDATE_FAILED + " (order_id=" + order.getOrderID() + ")",
+                    exception
             );
         }
     }
 
-    private boolean orderExists(int id) throws SQLException {
+    // + buildObject(resultSet : ResultSet) : Order
+    public Order buildObject(ResultSet resultSet) throws SQLException {
+        int orderId = resultSet.getInt("order_id");
+        int caseId = resultSet.getInt("case_id");
+
+        CaseDAO caseDAO = new CaseDAO(connection);
+        Case caseReference = caseDAO.findCaseByID(caseId);
+
+        Order order = new Order(orderId, caseReference);
+
+        order.setCeremonyDetails(
+                resultSet.getString("ceremony_type"),
+                resultSet.getString("church"),
+                resultSet.getString("ceremony_date"),
+                resultSet.getString("ceremony_time")
+        );
+
+        order.setStatus(resultSet.getString("status"));
+
+        loadOrderLines(order);
+        order.calculateTotal();
+
+        return order;
+    }
+
+    private boolean orderExists(int orderId) throws SQLException {
         String sql = "SELECT order_id FROM orders WHERE order_id = ?";
 
-        try (PreparedStatement stmt = connection.prepareStatement(sql)) {
-            stmt.setInt(1, id);
-            try (ResultSet rs = stmt.executeQuery()) {
-                return rs.next();
+        try (PreparedStatement statement = connection.prepareStatement(sql)) {
+            statement.setInt(1, orderId);
+            try (ResultSet resultSet = statement.executeQuery()) {
+                return resultSet.next();
             }
         }
     }
 
-    private void insertOrder(Order order) throws SQLException {
+    private void insertOrderRow(Order order) throws SQLException {
         String sql =
-            "INSERT INTO orders (order_id, case_id, ceremony_type, church, ceremony_date, ceremony_time, total_amount, status) " +
-            "VALUES (?,?,?,?,?,?,?,?)";
+                "INSERT INTO orders (order_id, case_id, ceremony_type, church, ceremony_date, ceremony_time, total_amount, status) " +
+                "VALUES (?,?,?,?,?,?,?,?)";
 
-        try (PreparedStatement stmt = connection.prepareStatement(sql)) {
-            stmt.setInt(1, order.getOrderID());
-            stmt.setInt(2, order.getCaseRef().getCaseID());
-            stmt.setString(3, order.getCeremonyType());
-            stmt.setString(4, order.getChurch());
-            stmt.setString(5, order.getCeremonyDate());
-            stmt.setString(6, order.getCeremonyTime());
-            stmt.setDouble(7, order.getTotalAmount());
-            stmt.setString(8, order.getStatus());
-            stmt.executeUpdate();
+        try (PreparedStatement statement = connection.prepareStatement(sql)) {
+            statement.setInt(1, order.getOrderID());
+            statement.setInt(2, order.getCaseRef().getCaseID());
+            statement.setString(3, order.getCeremonyType());
+            statement.setString(4, order.getChurch());
+            statement.setString(5, order.getCeremonyDate());
+            statement.setString(6, order.getCeremonyTime());
+            statement.setDouble(7, order.getTotalAmount());
+            statement.setString(8, order.getStatus());
+            statement.executeUpdate();
         }
     }
 
-    private void updateOrder(Order order) throws SQLException {
+    private void updateOrderRow(Order order) throws SQLException {
         String sql =
-            "UPDATE orders SET case_id=?, ceremony_type=?, church=?, ceremony_date=?, ceremony_time=?, total_amount=?, status=? " +
-            "WHERE order_id=?";
+                "UPDATE orders SET case_id=?, ceremony_type=?, church=?, ceremony_date=?, ceremony_time=?, total_amount=?, status=? " +
+                "WHERE order_id=?";
 
-        try (PreparedStatement stmt = connection.prepareStatement(sql)) {
-            stmt.setInt(1, order.getCaseRef().getCaseID());
-            stmt.setString(2, order.getCeremonyType());
-            stmt.setString(3, order.getChurch());
-            stmt.setString(4, order.getCeremonyDate());
-            stmt.setString(5, order.getCeremonyTime());
-            stmt.setDouble(6, order.getTotalAmount());
-            stmt.setString(7, order.getStatus());
-            stmt.setInt(8, order.getOrderID());
-            stmt.executeUpdate();
+        try (PreparedStatement statement = connection.prepareStatement(sql)) {
+            statement.setInt(1, order.getCaseRef().getCaseID());
+            statement.setString(2, order.getCeremonyType());
+            statement.setString(3, order.getChurch());
+            statement.setString(4, order.getCeremonyDate());
+            statement.setString(5, order.getCeremonyTime());
+            statement.setDouble(6, order.getTotalAmount());
+            statement.setString(7, order.getStatus());
+            statement.setInt(8, order.getOrderID());
+            statement.executeUpdate();
         }
     }
 
-    private void deleteOrderLines(int orderID) throws SQLException {
+    private void deleteOrderLines(int orderId) throws SQLException {
         String sql = "DELETE FROM orderline WHERE order_id = ?";
 
-        try (PreparedStatement stmt = connection.prepareStatement(sql)) {
-            stmt.setInt(1, orderID);
-            stmt.executeUpdate();
+        try (PreparedStatement statement = connection.prepareStatement(sql)) {
+            statement.setInt(1, orderId);
+            statement.executeUpdate();
         }
     }
 
     private void insertOrderLines(Order order) throws SQLException {
         String sql =
-            "INSERT INTO orderline (line_id, order_id, product_id, service_id, quantity, unit_price) " +
-            "VALUES (?, ?, ?, ?, ?, ?)";
+                "INSERT INTO orderline (line_id, order_id, product_id, service_id, quantity, unit_price) " +
+                "VALUES (?, ?, ?, ?, ?, ?)";
 
-        for (OrderLine line : order.getOrderLines()) {
-            try (PreparedStatement stmt = connection.prepareStatement(sql)) {
-                stmt.setInt(1, line.getLineID());
-                stmt.setInt(2, order.getOrderID());
+        try (PreparedStatement statement = connection.prepareStatement(sql)) {
+            for (OrderLine orderLine : order.getOrderLines()) {
+                statement.setInt(1, orderLine.getLineID());
+                statement.setInt(2, order.getOrderID());
 
-                if (line.getProduct() != null) {
-                    stmt.setInt(3, line.getProduct().getProductID());
-                    stmt.setNull(4, Types.INTEGER);
+                if (orderLine.getProduct() != null) {
+                    statement.setInt(3, orderLine.getProduct().getProductID());
+                    statement.setNull(4, Types.INTEGER);
+                } else {
+                    statement.setNull(3, Types.INTEGER);
+                    statement.setInt(4, orderLine.getService().getServiceID());
                 }
-                else if (line.getService() != null) {
-                    stmt.setNull(3, Types.INTEGER);
-                    stmt.setInt(4, line.getService().getServiceID());
-                }
 
-                stmt.setInt(5, line.getQuantity());
-                stmt.setDouble(6, line.getUnitPrice());
-                stmt.executeUpdate();
+                statement.setInt(5, orderLine.getQuantity());
+                statement.setDouble(6, orderLine.getUnitPrice());
+                statement.addBatch();
+            }
+            statement.executeBatch();
+        }
+    }
+
+    private void loadOrderLines(Order order) throws SQLException {
+        String sql = "SELECT * FROM orderline WHERE order_id = ?";
+
+        try (PreparedStatement statement = connection.prepareStatement(sql)) {
+            statement.setInt(1, order.getOrderID());
+
+            try (ResultSet resultSet = statement.executeQuery()) {
+                ProductDAO productDAO = new ProductDAO(connection);
+                ServiceDAO serviceDAO = new ServiceDAO(connection);
+
+                while (resultSet.next()) {
+                    int quantity = resultSet.getInt("quantity");
+                    Integer productId = (Integer) resultSet.getObject("product_id");
+                    Integer serviceId = (Integer) resultSet.getObject("service_id");
+
+                    if (productId != null) {
+                        Product product = productDAO.findProductByID(productId);
+                        order.addProduct(product, quantity);
+                    } else {
+                        Service service = serviceDAO.findServiceByID(serviceId);
+                        order.addService(service);
+                    }
+                }
             }
         }
     }
 
-    private Order buildOrder(ResultSet rs) throws SQLException {
-        int id = rs.getInt("order_id");
-        int caseID = rs.getInt("case_id");
+    private int generateNextOrderId() {
+        String sql = "SELECT COALESCE(MAX(order_id), 0) + 1 AS next_id FROM orders";
 
-        CaseDAO caseDAO = new CaseDAO(connection);
-        Case caseRef = caseDAO.findCaseByID(caseID);
+        try (PreparedStatement statement = connection.prepareStatement(sql);
+             ResultSet resultSet = statement.executeQuery()) {
 
-        Order order = new Order(id, caseRef);
+            resultSet.next();
+            return resultSet.getInt("next_id");
 
-        order.setCeremonyDetails(
-            rs.getString("ceremony_type"),
-            rs.getString("church"),
-            rs.getString("ceremony_date"),
-            rs.getString("ceremony_time")
-        );
-
-        order.setStatus(rs.getString("status"));
-
-        return order;
-    }
-
-    private void loadOrderLines(Order order) {
-        String sql = "SELECT * FROM orderline WHERE order_id = ?";
-
-        try (PreparedStatement stmt = connection.prepareStatement(sql)) {
-            stmt.setInt(1, order.getOrderID());
-
-            try (ResultSet rs = stmt.executeQuery()) {
-                ProductDAO productDAO = new ProductDAO(connection);
-                ServiceDAO serviceDAO = new ServiceDAO(connection);
-
-                while (rs.next()) {
-                    int quantity = rs.getInt("quantity");
-
-                    Integer productID = (Integer) rs.getObject("product_id");
-                    Integer serviceID = (Integer) rs.getObject("service_id");
-
-                    if (productID != null) {
-                        Product p = productDAO.findProductByID(productID);
-                        order.addProduct(p, quantity);
-                    }
-                    else if (serviceID != null) {
-                        Service s = serviceDAO.findServiceByID(serviceID);
-                        order.addService(s);
-                    }
-                }
-            }
-
-            order.calculateTotal();
-
-        } catch (SQLException e) {
-            throw new DataAccessException(
-                "Failed to load order lines for order " + order.getOrderID(), e
-            );
+        } catch (SQLException exception) {
+            throw new DataAccessException(DBMessages.QUERY_FAILED, exception);
         }
     }
 }
