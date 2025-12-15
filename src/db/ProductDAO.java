@@ -5,7 +5,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import model.Product;
-import exception.DataAccessException;
+import db.DataAccessException;
 
 public class ProductDAO implements ProductDAOIF {
 
@@ -31,12 +31,12 @@ public class ProductDAO implements ProductDAOIF {
                         rs.getDouble("price")
                     );
                 }
-                return null;
+                return null; // Produkt ikke fundet
             }
 
         } catch (SQLException e) {
             throw new DataAccessException(
-                + id,
+                "Kunne ikke hente produkt med ID: " + id,
                 e
             );
         }
@@ -61,9 +61,10 @@ public class ProductDAO implements ProductDAOIF {
 
         } catch (SQLException e) {
             throw new DataAccessException(
-               ,
+                "Kunne ikke hente listen af produkter",
                 e
             );
         }
     }
 }
+
